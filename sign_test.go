@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"os"
 	"os/exec"
 	"testing"
@@ -132,7 +131,7 @@ func TestUnmarshalSignedAttribute(t *testing.T) {
 	oidTest := asn1.ObjectIdentifier{2, 3, 4, 5, 6, 7}
 	testValue := "TestValue"
 	if err := toBeSigned.AddSigner(cert.Certificate, *cert.PrivateKey, SignerInfoConfig{
-		ExtraSignedAttributes: []Attribute{Attribute{Type: oidTest, Value: testValue}},
+		ExtraSignedAttributes: []Attribute{{Type: oidTest, Value: testValue}},
 	}); err != nil {
 		t.Fatalf("Cannot add signer: %s", err)
 	}
@@ -189,11 +188,4 @@ func testOpenSSLParse(t *testing.T, certBytes []byte) {
 		t.Fatal(err)
 	}
 
-}
-func fromHex(s string) *big.Int {
-	result, ok := new(big.Int).SetString(s, 16)
-	if !ok {
-		panic(s)
-	}
-	return result
 }
