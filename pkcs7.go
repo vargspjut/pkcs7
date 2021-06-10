@@ -4,7 +4,6 @@ package pkcs7
 import (
 	"bytes"
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -54,9 +53,6 @@ var (
 	OIDDigestAlgorithmSHA384 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
 	OIDDigestAlgorithmSHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}
 
-	OIDDigestAlgorithmDSA     = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
-	OIDDigestAlgorithmDSASHA1 = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 3}
-
 	OIDDigestAlgorithmECDSASHA1   = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 1}
 	OIDDigestAlgorithmECDSASHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	OIDDigestAlgorithmECDSASHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
@@ -85,7 +81,6 @@ var (
 func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 	switch {
 	case oid.Equal(OIDDigestAlgorithmSHA1), oid.Equal(OIDDigestAlgorithmECDSASHA1),
-		oid.Equal(OIDDigestAlgorithmDSA), oid.Equal(OIDDigestAlgorithmDSASHA1),
 		oid.Equal(OIDEncryptionAlgorithmRSA):
 		return crypto.SHA1, nil
 	case oid.Equal(OIDDigestAlgorithmSHA256), oid.Equal(OIDDigestAlgorithmECDSASHA256):
@@ -144,8 +139,6 @@ func getOIDForEncryptionAlgorithm(pkey crypto.PrivateKey, OIDDigestAlg asn1.Obje
 		case OIDDigestAlg.Equal(OIDDigestAlgorithmSHA512):
 			return OIDDigestAlgorithmECDSASHA512, nil
 		}
-	case *dsa.PrivateKey:
-		return OIDDigestAlgorithmDSA, nil
 	}
 	return nil, fmt.Errorf("pkcs7: cannot convert encryption algorithm to oid, unknown private key type %T", pkey)
 

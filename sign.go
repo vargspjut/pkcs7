@@ -3,7 +3,6 @@ package pkcs7
 import (
 	"bytes"
 	"crypto"
-	"crypto/dsa"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -124,10 +123,10 @@ func (sd *SignedData) AddSigner(ee *x509.Certificate, pkey crypto.PrivateKey, co
 // The signature algorithm used to hash the data is the one of the end-entity
 // certificate.
 func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKey, parents []*x509.Certificate, config SignerInfoConfig) error {
-// Following RFC 2315, 9.2 SignerInfo type, the distinguished name of
-// the issuer of the end-entity signer is stored in the issuerAndSerialNumber
-// section of the SignedData.SignerInfo, alongside the serial number of
-// the end-entity.
+	// Following RFC 2315, 9.2 SignerInfo type, the distinguished name of
+	// the issuer of the end-entity signer is stored in the issuerAndSerialNumber
+	// section of the SignedData.SignerInfo, alongside the serial number of
+	// the end-entity.
 	var ias issuerAndSerial
 	ias.SerialNumber = ee.SerialNumber
 	if len(parents) == 0 {
@@ -214,17 +213,6 @@ func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateK
 	h.Write(sd.data)
 	sd.messageDigest = h.Sum(nil)
 	switch pkey := pkey.(type) {
-	case *dsa.PrivateKey:
-		// dsa doesn't implement crypto.Signer so we make a special case
-		// https://github.com/golang/go/issues/27889
-		r, s, err := dsa.Sign(rand.Reader, pkey, sd.messageDigest)
-		if err != nil {
-			return err
-		}
-		signature, err = asn1.Marshal(dsaSignature{r, s})
-		if err != nil {
-			return err
-		}
 	default:
 		key, ok := pkey.(crypto.Signer)
 		if !ok {
@@ -359,26 +347,11 @@ func signAttributes(attrs []attribute, pkey crypto.PrivateKey, digestAlg crypto.
 	h.Write(attrBytes)
 	hash := h.Sum(nil)
 
-	// dsa doesn't implement crypto.Signer so we make a special case
-	// https://github.com/golang/go/issues/27889
-	switch pkey := pkey.(type) {
-	case *dsa.PrivateKey:
-		r, s, err := dsa.Sign(rand.Reader, pkey, hash)
-		if err != nil {
-			return nil, err
-		}
-		return asn1.Marshal(dsaSignature{r, s})
-	}
-
 	key, ok := pkey.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("pkcs7: private key does not implement crypto.Signer")
 	}
 	return key.Sign(rand.Reader, hash, digestAlg)
-}
-
-type dsaSignature struct {
-	R, S *big.Int
 }
 
 // concats and wraps the certificates in the RawValue structure
