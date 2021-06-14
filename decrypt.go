@@ -9,9 +9,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"hash"
 )
 
 // ErrUnsupportedAlgorithm tells you when our quick dev assumptions have failed
@@ -19,6 +21,32 @@ var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, 
 
 // ErrNotEncryptedContent is returned when attempting to Decrypt data that is not encrypted data
 var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable data type")
+
+// RFC 4055, 4.1
+type rsaOAEPAlgParams struct {
+	HashFunc    pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:0,default:sha1Identifier"`
+	MaskGenFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:1,default:mgf1SHA1Identifier"`
+	PSourceFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:2,default:pSpecifiedEmptyIdentifier"`
+}
+
+func (roap rsaOAEPAlgParams) hash() (h hash.Hash, err error) {
+	switch {
+	case roap.HashFunc.Algorithm == nil:
+		fallthrough // Use SHA1 as default
+	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA1):
+		h = crypto.SHA1.New()
+	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA256):
+		h = crypto.SHA256.New()
+	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA384):
+		h = crypto.SHA384.New()
+	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA512):
+		h = crypto.SHA512.New()
+	default:
+		err = fmt.Errorf("pkcs7: hash function with asn.1 oid %s unsupported for rsa-oaep",
+			roap.HashFunc.Algorithm.String())
+	}
+	return
+}
 
 // Decrypt decrypts encrypted content info for recipient cert and private key
 func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte, error) {
@@ -30,16 +58,50 @@ func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte
 	if recipient.EncryptedKey == nil {
 		return nil, errors.New("pkcs7: no enveloped recipient for provided certificate")
 	}
-	switch pkey := pkey.(type) {
-	case *rsa.PrivateKey:
-		var contentKey []byte
-		contentKey, err := rsa.DecryptPKCS1v15(rand.Reader, pkey, recipient.EncryptedKey)
-		if err != nil {
+
+	rsaKey, ok := pkey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, ErrUnsupportedAlgorithm
+	}
+
+	var (
+		contentKey []byte
+		err        error
+	)
+
+	switch {
+	case recipient.KeyEncryptionAlgorithm.Algorithm.Equal(OIDEncryptionAlgorithmRSA):
+		if contentKey, err = rsa.DecryptPKCS1v15(rand.Reader, rsaKey, recipient.EncryptedKey); err != nil {
 			return nil, err
 		}
-		return data.EncryptedContentInfo.decrypt(contentKey)
+	case recipient.KeyEncryptionAlgorithm.Algorithm.Equal(OIDEncryptionAlgorithmRSAESOAEP):
+		var (
+			params rsaOAEPAlgParams
+			rest   []byte
+			hash   hash.Hash
+		)
+
+		if rest, err = asn1.Unmarshal(recipient.KeyEncryptionAlgorithm.Parameters.FullBytes, &params); err != nil {
+			return nil, err
+		}
+
+		if len(rest) > 0 {
+			return nil, errors.New("pkcs7: unexpected rest bytes after RSAES-OAEP parameters")
+		}
+
+		if hash, err = params.hash(); err != nil {
+			return nil, err
+		}
+
+		if contentKey, err = rsa.DecryptOAEP(hash, rand.Reader, rsaKey, recipient.EncryptedKey, nil); err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, ErrUnsupportedAlgorithm
 	}
-	return nil, ErrUnsupportedAlgorithm
+
+	return data.EncryptedContentInfo.decrypt(contentKey)
 }
 
 // DecryptUsingPSK decrypts encrypted data using caller provided
