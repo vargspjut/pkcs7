@@ -22,14 +22,14 @@ var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, 
 // ErrNotEncryptedContent is returned when attempting to Decrypt data that is not encrypted data
 var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable data type")
 
-// RSAOAEPAlgParams describes the digest when using RSAES-OAEP. RFC 4055, section 4.1
-type RSAOAEPAlgParams struct {
+// rsaOAEPAlgParams describes the digest when using RSAES-OAEP. RFC 4055, section 4.1
+type rsaOAEPAlgParams struct {
 	HashFunc    pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:0,default:sha1Identifier"`
 	MaskGenFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:1,default:mgf1SHA1Identifier"`
 	PSourceFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:2,default:pSpecifiedEmptyIdentifier"`
 }
 
-func (roap RSAOAEPAlgParams) hash() (hash.Hash, error) {
+func (roap rsaOAEPAlgParams) hash() (hash.Hash, error) {
 
 	oid := roap.HashFunc.Algorithm
 	if oid == nil {
@@ -67,7 +67,7 @@ func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte
 		}
 	case recipient.KeyEncryptionAlgorithm.Algorithm.Equal(OIDEncryptionAlgorithmRSAESOAEP):
 		var (
-			params RSAOAEPAlgParams
+			params rsaOAEPAlgParams
 			rest   []byte
 			hash   hash.Hash
 		)
@@ -87,7 +87,6 @@ func (p7 *PKCS7) Decrypt(cert *x509.Certificate, pkey crypto.PrivateKey) ([]byte
 		if contentKey, err = rsa.DecryptOAEP(hash, rand.Reader, rsaKey, recipient.EncryptedKey, nil); err != nil {
 			return nil, err
 		}
-
 	default:
 		return nil, ErrUnsupportedAlgorithm
 	}

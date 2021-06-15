@@ -7,7 +7,7 @@ import (
 )
 
 func TestEncrypt(t *testing.T) {
-	modes := []int{
+	modes := []ContentEncryptionAlgorithm{
 		EncryptionAlgorithmDESCBC,
 		EncryptionAlgorithmAES128CBC,
 		EncryptionAlgorithmAES256CBC,
@@ -28,7 +28,7 @@ func TestEncrypt(t *testing.T) {
 				t.Fatal(err)
 			}
 			encrypted, err := Encrypt(plaintext, []*x509.Certificate{cert.Certificate},
-				WithEncryptionContentAlgorithm(mode))
+				WithContentAlgorithm(mode))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -48,7 +48,7 @@ func TestEncrypt(t *testing.T) {
 }
 
 func TestEncryptUsingPSK(t *testing.T) {
-	modes := []int{
+	modes := []ContentEncryptionAlgorithm{
 		EncryptionAlgorithmDESCBC,
 		EncryptionAlgorithmAES128GCM,
 	}
@@ -64,7 +64,7 @@ func TestEncryptUsingPSK(t *testing.T) {
 			key = []byte("128BitKey4AESGCM")
 		}
 		ciphertext, err := EncryptUsingPSK(plaintext, key,
-			WithEncryptionContentAlgorithm(mode))
+			WithContentAlgorithm(mode))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -21,7 +21,7 @@ type EncryptOption func(*EncryptOptions) error
 type EncryptOptions struct {
 	Digest     asn1.ObjectIdentifier
 	KeyAlg     asn1.ObjectIdentifier
-	ContentAlg int
+	ContentAlg ContentEncryptionAlgorithm
 }
 
 func defaultEncryptOptions() *EncryptOptions {
@@ -32,28 +32,33 @@ func defaultEncryptOptions() *EncryptOptions {
 	}
 }
 
-// WithEncryptionDigestAlgorithm configures what hash function to use for
-// key encryption.
+// WithKeyDigestAlgorithmOID configures what hash function to use
+// while encrypting the key.
 // NOTE: Only applicable when key encryption algorithm is RSAES-OAEP.
-func WithEncryptionDigestAlgorithm(d asn1.ObjectIdentifier) EncryptOption {
+func WithKeyDigestAlgorithmOID(d asn1.ObjectIdentifier) EncryptOption {
 	return func(o *EncryptOptions) error {
 		o.Digest = d
 		return nil
 	}
 }
 
-// WithEncryptionKeyAlgorithm configures what encryption algorithm to
+// WithKeyAlgorithmOID configures what encryption algorithm to
 // use for key encryption
-func WithEncryptionKeyAlgorithm(d asn1.ObjectIdentifier) EncryptOption {
+func WithKeyAlgorithmOID(d asn1.ObjectIdentifier) EncryptOption {
 	return func(o *EncryptOptions) error {
+		if !d.Equal(OIDEncryptionAlgorithmRSAESOAEP) &&
+			!d.Equal(OIDEncryptionAlgorithmRSA) {
+			return errors.New("pkcs7: only RSA and RSAES-OAEP can be used for key encryption")
+		}
+
 		o.KeyAlg = d
 		return nil
 	}
 }
 
-// WithEncryptionContentAlgorithm configures what encryption algorithm to
-// use for content encryption
-func WithEncryptionContentAlgorithm(a int) EncryptOption {
+// WithContentAlgorithm configures what encryption algorithm to
+// use for encrypting the content
+func WithContentAlgorithm(a ContentEncryptionAlgorithm) EncryptOption {
 	return func(o *EncryptOptions) error {
 		o.ContentAlg = a
 		return nil
@@ -84,9 +89,13 @@ type encryptedContentInfo struct {
 	EncryptedContent           asn1.RawValue `asn1:"tag:0,optional"`
 }
 
+// ContentEncryptionAlgorithm is a type that describes a supported
+// content symmetric encryption scheme
+type ContentEncryptionAlgorithm int
+
 const (
 	// EncryptionAlgorithmDESCBC is the DES CBC encryption algorithm
-	EncryptionAlgorithmDESCBC = iota
+	EncryptionAlgorithmDESCBC ContentEncryptionAlgorithm = iota
 
 	// EncryptionAlgorithmAES128CBC is the AES 128 bits with CBC encryption algorithm
 	// Avoid this algorithm unless required for interoperability; use AES GCM instead.
@@ -291,15 +300,6 @@ func encryptAESCBC(content []byte, key []byte, opts *EncryptOptions) ([]byte, *e
 
 // Encrypt creates and returns an envelope data PKCS7 structure with encrypted
 // recipient keys for each recipient public key.
-//
-// The algorithm used to perform encryption is determined by the current value
-// of the global ContentEncryptionAlgorithm package variable. By default, the
-// value is EncryptionAlgorithmDESCBC. To use a different algorithm, change the
-// value before calling Encrypt(). For example:
-//
-//     ContentEncryptionAlgorithm = EncryptionAlgorithmAES128GCM
-//
-// TODO(fullsailor): Add support for encrypting content with other algorithms
 func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOption) ([]byte, error) {
 	var eci *encryptedContentInfo
 	var key []byte
@@ -344,9 +344,10 @@ func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOpti
 			return nil, err
 		}
 
-		params := asn1.NullRawValue
+		keyAlgParams := asn1.NullRawValue
+
 		if options.KeyAlg.Equal(OIDEncryptionAlgorithmRSAESOAEP) {
-			oaepParams := RSAOAEPAlgParams{
+			oaepParams := rsaOAEPAlgParams{
 				HashFunc: pkix.AlgorithmIdentifier{
 					Algorithm:  options.Digest,
 					Parameters: asn1.NullRawValue,
@@ -355,12 +356,12 @@ func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOpti
 				PSourceFunc: pSpecifiedEmptyIdentifier,
 			}
 
-			data, err := asn1.Marshal(&oaepParams)
+			data, err := asn1.Marshal(oaepParams)
 			if err != nil {
 				return nil, err
 			}
 
-			params.FullBytes = data
+			keyAlgParams.FullBytes = data
 		}
 
 		info := recipientInfo{
@@ -368,7 +369,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOpti
 			IssuerAndSerialNumber: ias,
 			KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 				Algorithm:  options.KeyAlg,
-				Parameters: params,
+				Parameters: keyAlgParams,
 			},
 			EncryptedKey: encrypted,
 		}
