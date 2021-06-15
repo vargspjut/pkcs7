@@ -11,6 +11,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"hash"
 	"sort"
 
 	_ "crypto/sha1" // for crypto.SHA1
@@ -92,6 +93,28 @@ func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 		return crypto.SHA512, nil
 	}
 	return crypto.Hash(0), ErrUnsupportedAlgorithm
+}
+
+func getHashFuncForOID(oid asn1.ObjectIdentifier) (h hash.Hash, err error) {
+
+	hoid, err := getHashForOID(oid)
+	if err != nil {
+		return nil, err
+	}
+
+	switch hoid {
+	case crypto.SHA1:
+		h = crypto.SHA1.New()
+	case crypto.SHA256:
+		h = crypto.SHA256.New()
+	case crypto.SHA384:
+		h = crypto.SHA384.New()
+	case crypto.SHA512:
+		h = crypto.SHA512.New()
+	default:
+		err = fmt.Errorf("pkcs7: hash function with asn.1 oid %s is unsupported", oid)
+	}
+	return
 }
 
 // getDigestOIDForSignatureAlgorithm takes an x509.SignatureAlgorithm

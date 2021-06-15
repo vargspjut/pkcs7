@@ -17,35 +17,26 @@ import (
 )
 
 // ErrUnsupportedAlgorithm tells you when our quick dev assumptions have failed
-var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, DES, DES-EDE3, AES-256-CBC and AES-128-GCM supported")
+var ErrUnsupportedAlgorithm = errors.New("pkcs7: cannot decrypt data: only RSA, RSAES-OAEP, DES, DES-EDE3, AES-256-CBC, AES-128-GCM, AES-256-GCM supported")
 
 // ErrNotEncryptedContent is returned when attempting to Decrypt data that is not encrypted data
 var ErrNotEncryptedContent = errors.New("pkcs7: content data is a decryptable data type")
 
-// RFC 4055, 4.1
+// RFC 4055, section 4.1
 type rsaOAEPAlgParams struct {
 	HashFunc    pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:0,default:sha1Identifier"`
 	MaskGenFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:1,default:mgf1SHA1Identifier"`
 	PSourceFunc pkix.AlgorithmIdentifier `asn1:"optional,explicit,tag:2,default:pSpecifiedEmptyIdentifier"`
 }
 
-func (roap rsaOAEPAlgParams) hash() (h hash.Hash, err error) {
-	switch {
-	case roap.HashFunc.Algorithm == nil:
-		fallthrough // Use SHA1 as default
-	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA1):
-		h = crypto.SHA1.New()
-	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA256):
-		h = crypto.SHA256.New()
-	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA384):
-		h = crypto.SHA384.New()
-	case roap.HashFunc.Algorithm.Equal(OIDDigestAlgorithmSHA512):
-		h = crypto.SHA512.New()
-	default:
-		err = fmt.Errorf("pkcs7: hash function with asn.1 oid %s unsupported for rsa-oaep",
-			roap.HashFunc.Algorithm.String())
+func (roap rsaOAEPAlgParams) hash() (hash.Hash, error) {
+
+	oid := roap.HashFunc.Algorithm
+	if oid == nil {
+		oid = OIDDigestAlgorithmSHA1 // Default
 	}
-	return
+
+	return getHashFuncForOID(oid)
 }
 
 // Decrypt decrypts encrypted content info for recipient cert and private key
