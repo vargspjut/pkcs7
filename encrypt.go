@@ -343,11 +343,32 @@ func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOpti
 		if err != nil {
 			return nil, err
 		}
+
+		params := asn1.NullRawValue
+		if options.KeyAlg.Equal(OIDEncryptionAlgorithmRSAESOAEP) {
+			oaepParams := rsaOAEPAlgParams{
+				HashFunc: pkix.AlgorithmIdentifier{
+					Algorithm:  options.Digest,
+					Parameters: asn1.NullRawValue,
+				},
+				MaskGenFunc: mgf1SHA1Identifier,
+				PSourceFunc: pSpecifiedEmptyIdentifier,
+			}
+
+			data, err := asn1.Marshal(&oaepParams)
+			if err != nil {
+				return nil, err
+			}
+
+			params.FullBytes = data
+		}
+
 		info := recipientInfo{
 			Version:               0,
 			IssuerAndSerialNumber: ias,
 			KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
-				Algorithm: options.KeyAlg,
+				Algorithm:  options.KeyAlg,
+				Parameters: params,
 			},
 			EncryptedKey: encrypted,
 		}

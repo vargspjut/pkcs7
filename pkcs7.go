@@ -39,6 +39,7 @@ var ErrUnsupportedContentType = errors.New("pkcs7: cannot parse data: unimplemen
 type unsignedData []byte
 
 var (
+
 	// Signed Data OIDs
 	OIDData                   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
 	OIDSignedData             = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
@@ -78,6 +79,32 @@ var (
 	OIDEncryptionAlgorithmAES128GCM  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 6}
 	OIDEncryptionAlgorithmAES128CBC  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 2}
 	OIDEncryptionAlgorithmAES256GCM  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
+
+	oidMGF1       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 8}
+	oidpSpecified = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 9}
+)
+
+var (
+	mgf1SHA1Identifier = pkix.AlgorithmIdentifier{
+		Algorithm: oidMGF1,
+		// RFC 4055, 2.1 sha1Identifier
+		Parameters: asn1.RawValue{
+			Class:      asn1.ClassUniversal,
+			Tag:        asn1.TagSequence,
+			IsCompound: false,
+			Bytes:      []byte{6, 5, 43, 14, 3, 2, 26, 5, 0},
+			FullBytes:  []byte{16, 9, 6, 5, 43, 14, 3, 2, 26, 5, 0}},
+	}
+	pSpecifiedEmptyIdentifier = pkix.AlgorithmIdentifier{
+		Algorithm: oidpSpecified,
+		// RFC 4055, 4.1 nullOctetString
+		Parameters: asn1.RawValue{
+			Class:      asn1.ClassUniversal,
+			Tag:        asn1.TagOctetString,
+			IsCompound: false,
+			Bytes:      []byte{},
+			FullBytes:  []byte{4, 0}},
+	}
 )
 
 func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
