@@ -346,7 +346,7 @@ func Encrypt(content []byte, recipients []*x509.Certificate, opts ...EncryptOpti
 
 		params := asn1.NullRawValue
 		if options.KeyAlg.Equal(OIDEncryptionAlgorithmRSAESOAEP) {
-			oaepParams := rsaOAEPAlgParams{
+			oaepParams := RSAOAEPAlgParams{
 				HashFunc: pkix.AlgorithmIdentifier{
 					Algorithm:  options.Digest,
 					Parameters: asn1.NullRawValue,
