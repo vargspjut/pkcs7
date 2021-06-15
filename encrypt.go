@@ -43,7 +43,8 @@ func WithKeyDigestAlgorithmOID(d asn1.ObjectIdentifier) EncryptOption {
 }
 
 // WithKeyAlgorithmOID configures what encryption algorithm to
-// use for key encryption
+// use for key encryption. Must be OIDEncryptionAlgorithmRSAESOAEP
+// or OIDEncryptionAlgorithmRSA.
 func WithKeyAlgorithmOID(d asn1.ObjectIdentifier) EncryptOption {
 	return func(o *EncryptOptions) error {
 		if !d.Equal(OIDEncryptionAlgorithmRSAESOAEP) &&
