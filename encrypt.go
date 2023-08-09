@@ -124,7 +124,7 @@ var ErrPSKNotProvided = errors.New("pkcs7: cannot encrypt content: PSK not provi
 const nonceSize = 12
 
 type aesGCMParameters struct {
-	Nonce  []byte `asn1:"tag:4"`
+	Nonce  []byte
 	ICVLen int
 }
 
@@ -183,13 +183,17 @@ func encryptAESGCM(content []byte, key []byte, opts *EncryptOptions) ([]byte, *e
 		return nil, nil, err
 	}
 
+	fullBytes := []byte{48, byte(len(paramBytes))}
+	fullBytes = append(fullBytes, paramBytes...)
+
 	eci := encryptedContentInfo{
 		ContentType: OIDData,
 		ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 			Algorithm: algID,
 			Parameters: asn1.RawValue{
-				Tag:   asn1.TagSequence,
-				Bytes: paramBytes,
+				Tag:       asn1.TagSequence,
+				Bytes:     paramBytes,
+				FullBytes: fullBytes,
 			},
 		},
 		EncryptedContent: marshalEncryptedContent(ciphertext),
@@ -453,7 +457,12 @@ func EncryptUsingPSK(content []byte, key []byte, opts ...EncryptOption) ([]byte,
 
 func marshalEncryptedContent(content []byte) asn1.RawValue {
 	asn1Content, _ := asn1.Marshal(content)
-	return asn1.RawValue{Tag: 0, Class: 2, Bytes: asn1Content, IsCompound: true}
+	return asn1.RawValue{
+		Tag:        0,
+		Class:      asn1.ClassContextSpecific,
+		Bytes:      asn1Content,
+		IsCompound: true,
+	}
 }
 
 func encryptKey(key []byte, recipient *x509.Certificate, opts *EncryptOptions) ([]byte, error) {

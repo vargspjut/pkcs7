@@ -93,7 +93,7 @@ var (
 			Tag:        asn1.TagSequence,
 			IsCompound: false,
 			Bytes:      []byte{6, 5, 43, 14, 3, 2, 26, 5, 0},
-			FullBytes:  []byte{16, 9, 6, 5, 43, 14, 3, 2, 26, 5, 0}},
+			FullBytes:  []byte{48, 9, 6, 5, 43, 14, 3, 2, 26, 5, 0}},
 	}
 	pSpecifiedEmptyIdentifier = pkix.AlgorithmIdentifier{
 		Algorithm: oidpSpecified,
