@@ -161,7 +161,22 @@ func (eci encryptedContentInfo) decrypt(key []byte) ([]byte, error) {
 
 		_, err := asn1.Unmarshal(paramBytes, &params)
 		if err != nil {
-			return nil, err
+
+			// Test legacy (and faulty) ASN.1 structure to allow
+			// libraries depending on older pkcs7 releases to still
+			// function.
+			paramsLegacy := struct {
+				Nonce  []byte `asn1:"tag:4"`
+				ICVLen int
+			}{}
+
+			_, err := asn1.Unmarshal(paramBytes, &paramsLegacy)
+			if err != nil {
+				return nil, err
+			}
+
+			params.Nonce = paramsLegacy.Nonce
+			params.ICVLen = paramsLegacy.ICVLen
 		}
 
 		gcm, err := cipher.NewGCM(block)
